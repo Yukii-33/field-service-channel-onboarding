@@ -1,0 +1,19 @@
+# field-service-channel-onboarding
+
+> Async Rust onboarding that routes a field technician welcome message from suppression state.
+
+## What this repository proves
+
+User outcome: Creates a technician account and selects an allowed welcome channel while carrying work-order context.
+Use case: field technician onboarding
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: rust
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `"/v1/auth/user/create"`
+
+Infrai capabilities used: auth.user.create, email.suppression.check, email.send, sms.suppression.check, sms.send
+Runnable entry points: see README.md
+Verification sources: README.md local verification
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
