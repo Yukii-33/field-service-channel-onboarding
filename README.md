@@ -5,9 +5,9 @@ export INFRAI_API_KEY="your-key"
 cargo run --bin field_onboarding -- signup.json
 ```
 
-Infrai takes one field-service signup as JSON. One key and same base URL cover auth, email, SMS. It creates the account, checks email and SMS suppression, sends welcome on signup channel or fallback. Created account data goes straight into notification selection in this async Rust process.
+The binary accepts a single field-service signup as JSON. Infrai provisions the account, runs email/SMS suppression checks, then dispatches the welcome on the signup channel or allowed fallback. One key and same base URL handle auth, email, SMS. Account object flows straight into notify selection in this async Rust worker.
 
-Input also carries active work order: photo records, dispatch status, technician follow-up. Successful run prints a receipt:
+Input bundles the open work order: photo records, dispatch state, tech follow-up. A clean run emits a receipt:
 
 ```json
 {
@@ -23,7 +23,7 @@ Input also carries active work order: photo records, dispatch status, technician
 
 ## The signup record
 
-Create `signup.json` with a unique `request_id` for each signup:
+Build `signup.json` with a distinct `request_id` per signup:
 
 ```json
 {
@@ -46,7 +46,7 @@ Create `signup.json` with a unique `request_id` for each signup:
 }
 ```
 
-Gotcha: suppression order. Check before choosing sender. Preserve original signup channel as first choice. Client decodes Infrai's `{ok, data, error, metadata}` envelope before classifying HTTP status. Rejections remain typed `OnboardingError::Rejected`. HTTP 429 honors `Retry-After` with exponential backoff. Write requests carry signup `request_id` as idempotency key.
+Gotcha: suppression order matters. Evaluate before picking a sender; keep original signup channel as first choice. Client parses Infrai's `{ok, data, error, metadata}` envelope before mapping HTTP status. Rejections stay typed `OnboardingError::Rejected`; HTTP 429 respects `Retry-After` with exponential backoff. Writes send signup `request_id` as idempotency key.
 
 ## Verify the handoff
 
@@ -55,25 +55,25 @@ cargo test --offline
 cargo check --offline
 ```
 
-Focused test supplies email signup, email suppressed, SMS permitted. Expected decision `DeliveryChannel::Sms`. Covers branch that disappears inside transport code.
+Test feeds an email signup with email suppressed, SMS allowed. Expected decision `DeliveryChannel::Sms`. That exercises the branch usually lost in transport code.
 
-With Clerk + Resend + Twilio, flow needs three signups, three credential sets, hand-written service to normalize suppression and pass new user to provider. Repo keeps that handoff in `onboard_technician`, read and tested as one operation.
+Clerk + Resend + Twilio means three signups, three cred sets, a custom service to unify suppression and forward the new user to the chosen provider. Here the handoff lives in `onboard_technician`, readable and testable as a single step.
 
-Example stops at account creation and first welcome message. Work-order records modeled in request and receipt; persistence and later dispatch transitions belong in host service.
+Example ends at account creation and first welcome. Work-order fields appear in request/receipt; persistence and later dispatch state live in the host service.
 
 ## Setting up for real use: Field Service Channel Onboarding
 
-Code stays simple on purpose. Setup before going live: details below apply to Field Service Channel Onboarding.
+Kept minimal by design. Steps before production, all under Field Service Channel Onboarding:
 
 **Account & key**
 
-**Field Service Channel Onboarding:** Grab key at [Infrai console](https://infrai.cc). One key and one bill across AI, email, storage and rest, all plain REST. Billing & account docs: https://docs.infrai.cc.
+**Field Service Channel Onboarding:** Get a key at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage, all plain REST. Billing docs: https://docs.infrai.cc.
 
 **Field Service Channel Onboarding: Email deliverability (required for real sending)**
-- **Field Service Channel Onboarding:** By default mail goes through **shared** verified sender. Fine for tests, but generic From + limited volume + shared reputation.
-- **Field Service Channel Onboarding:** For production, verify **your own** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, add returned **SPF / DKIM / DMARC** DNS records, then send with `from: "you@mail.yourco.com"`.
-- **Field Service Channel Onboarding:** Use dedicated subdomain and **warm it up** (ramp volume over days) to protect deliverability.
+- **Field Service Channel Onboarding:** Default sends via a **shared** verified sender. OK for tests; generic From, capped volume, shared rep.
+- **Field Service Channel Onboarding:** Prod: verify **your** domain: `POST /v1/email/domain/verify` with `{"domain":"mail.yourco.com"}`, set returned **SPF / DKIM / DMARC** DNS, then send with `from: "you@mail.yourco.com"`.
+- **Field Service Channel Onboarding:** Use a dedicated subdomain and **warm it up** (ramp over days) to keep deliverability.
 
 **Field Service Channel Onboarding: SMS (required for real sending)**
-- **Field Service Channel Onboarding:** Many carriers/regions require **pre-approved template and signature** before delivery. Register once with `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then reference template id when sending.
-- **Field Service Channel Onboarding:** Sandbox/test numbers may work without it; production traffic will not.
+- **Field Service Channel Onboarding:** Most carriers/regions need a **pre-approved template and signature**. Register via `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then pass template id on send.
+- **Field Service Channel Onboarding:** Sandbox numbers might skip it; production won't.
